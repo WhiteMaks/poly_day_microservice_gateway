@@ -1,0 +1,13 @@
+version: "3.8"
+
+services:
+
+  rabbitmq:
+    image: rabbitmq:3-management-alpine
+    container_name: poly_day_microservice_authenticate_rabbitmq
+    environment:
+      RABBITMQ_DEFAULT_USER: "user"
+      RABBITMQ_DEFAULT_PASS: "password"
+    ports:
+      - "5672:5672"
+      - "15672:15672"
