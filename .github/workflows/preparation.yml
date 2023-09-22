@@ -1,0 +1,43 @@
+name: Poly Day release preparation microservice gateway
+
+on:
+  pull_request:
+    branches: [ "release_**" ]
+
+jobs:
+  build:
+    name: Build
+    runs-on: ubuntu-latest
+    env:
+      PROJECT_NAME: ${{vars.PROJECT_NAME}}
+      MICROSERVICE_NAME: ${{vars.MICROSERVICE_NAME}}
+      APP_NAME: ${PROJECT_NAME}-${MICROSERVICE_NAME}
+
+    steps:
+      - name: Preparing git branch
+        uses: actions/checkout@v3
+        with:
+          submodules: 'recursive'
+
+      - name: Setup SSH
+        uses: MrSquaare/ssh-setup-action@v1
+        with:
+          host: github.com
+          private-key: ${{ secrets.SSH_PRIVATE_KEY }}
+
+      - name: Set up Go
+        uses: actions/setup-go@v4
+        with:
+          go-version: '1.21'
+
+      - name: Setup git
+        run: make setup-git
+
+      - name: Up test environment
+        run: make up-test-environment
+
+      - name: Unit test
+        run: make test
+
+      - name: Build binary
+        run: make build
