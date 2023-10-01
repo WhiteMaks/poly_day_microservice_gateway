@@ -11,9 +11,12 @@ import (
 	"sync"
 )
 
+type Requests map[string]chan schema.Message
+
 type Microservice struct {
-	bus     *wbus.Rabbit
-	clients Clients
+	bus      *wbus.Rabbit
+	requests Requests
+	clients  Clients
 	sync.RWMutex
 }
 
@@ -39,6 +42,7 @@ func NewMs(bus *wbus.Rabbit) *Microservice {
 
 	ms.bus = bus
 	ms.clients = make(Clients)
+	ms.requests = make(Requests)
 
 	return ms
 }
@@ -48,7 +52,12 @@ func (ms *Microservice) Start(address string, path string) error {
 		ms.upgradeProtocol(writer, request)
 	})
 
-	err := http.ListenAndServe(address, nil)
+	err := ms.bus.SubscribeOnQueue(schema.PathMsGateway, ms.rootMessageHandler)
+	if err != nil {
+		return err
+	}
+
+	err = http.ListenAndServe(address, nil)
 	if err != nil {
 		return err
 	}
@@ -108,7 +117,7 @@ func (ms *Microservice) routeEvent(message Message, client *Client) error {
 		UserId: client.userId,
 	}
 
-	busMsg := schema.Message{
+	requestMsg := schema.Message{
 		FromMicroservice: ms.bus.Name,
 		ToMicroservice:   message.Microservice,
 		Method:           message.Method,
@@ -118,12 +127,43 @@ func (ms *Microservice) routeEvent(message Message, client *Client) error {
 		RequestId:        utils.RandomString(15),
 	}
 
-	err := ms.bus.SendMessageInQueue(message.Microservice, busMsg)
+	ms.requests[requestMsg.RequestId] = make(chan schema.Message)
+
+	err := ms.bus.SendMessageInQueue(message.Microservice, requestMsg)
 	if err != nil {
 		return err
 	}
 
+	responseMsg := <-ms.requests[requestMsg.RequestId]
+
+	methodName := generateFullMethodNameFromMessage(responseMsg)
+
+	if methodName == schema.CommandIdentifyUser10 {
+		client.userId = responseMsg.Meta.UserId
+	}
+
+	event := Event{
+		Status:       2000,
+		Microservice: responseMsg.FromMicroservice,
+		Method:       responseMsg.Method,
+		Version:      responseMsg.Version,
+		Body:         responseMsg.Body,
+	}
+
+	client.AddEvent(event)
+
 	return nil
+}
+
+func (ms *Microservice) rootMessageHandler(message schema.Message) {
+	if message.ResponseId == "" {
+		return
+	}
+
+}
+
+func generateFullMethodNameFromMessage(message schema.Message) string { //todo вынести метод в bus schema
+	return message.Method + "-" + message.Version
 }
 
 func checkOrigin(request *http.Request) bool {
