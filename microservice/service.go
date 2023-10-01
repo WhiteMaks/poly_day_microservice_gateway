@@ -7,6 +7,7 @@ import (
 	"github.com/gorilla/websocket"
 	"log"
 	"net/http"
+	"poly_day_microservice_gateway/utils"
 	"sync"
 )
 
@@ -102,12 +103,19 @@ func (ms *Microservice) routeEvent(message Message, client *Client) error {
 		return nil
 	}
 
+	busMeta := schema.Meta{
+		WsId:   client.wsId,
+		UserId: client.userId,
+	}
+
 	busMsg := schema.Message{
 		FromMicroservice: ms.bus.Name,
 		ToMicroservice:   message.Microservice,
 		Method:           message.Method,
 		Version:          message.Version,
 		Body:             message.Body,
+		Meta:             busMeta,
+		RequestId:        utils.RandomString(15),
 	}
 
 	err := ms.bus.SendMessageInQueue(message.Microservice, busMsg)
