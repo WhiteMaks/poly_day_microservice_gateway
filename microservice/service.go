@@ -152,6 +152,8 @@ func (ms *Microservice) routeEvent(message Message, client *Client) error {
 
 	client.AddEvent(event)
 
+	delete(ms.requests, responseMsg.ResponseId)
+
 	return nil
 }
 
@@ -160,6 +162,7 @@ func (ms *Microservice) rootMessageHandler(message schema.Message) {
 		return
 	}
 
+	ms.requests[message.ResponseId] <- message
 }
 
 func generateFullMethodNameFromMessage(message schema.Message) string { //todo вынести метод в bus schema
