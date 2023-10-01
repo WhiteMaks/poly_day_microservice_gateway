@@ -2,6 +2,7 @@ package microservice
 
 import (
 	"encoding/json"
+	"github.com/google/uuid"
 	"github.com/gorilla/websocket"
 	"log"
 	"time"
@@ -10,6 +11,8 @@ import (
 type Clients map[*Client]bool
 
 type Client struct {
+	wsId       string
+	userId     int64
 	connection *websocket.Conn
 	ms         *Microservice
 	events     chan Event
@@ -22,6 +25,8 @@ var (
 
 func newClient(connection *websocket.Conn, ms *Microservice) *Client {
 	return &Client{
+		userId:     -1,
+		wsId:       uuid.New().String(),
 		connection: connection,
 		ms:         ms,
 		events:     make(chan Event),

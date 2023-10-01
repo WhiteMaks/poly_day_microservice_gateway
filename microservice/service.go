@@ -2,6 +2,7 @@ package microservice
 
 import (
 	"encoding/json"
+	"github.com/WhiteMaks/poly_day_bus_schema/schema"
 	"github.com/WhiteMaks/poly_day_bus_schema/wbus"
 	"github.com/gorilla/websocket"
 	"log"
@@ -19,7 +20,7 @@ type Event struct {
 	Microservice string `json:"microservice"` //from microservice
 	//Type         string          `json:"type"`
 	Method  string          `json:"method"`
-	Version float64         `json:"version"`
+	Version string          `json:"version"`
 	Status  int64           `json:"status"`
 	Body    json.RawMessage `json:"body"`
 }
@@ -28,7 +29,7 @@ type Message struct {
 	Microservice string `json:"microservice"` //to microservice
 	//Type         string          `json:"type"`
 	Method  string          `json:"method"`
-	Version float64         `json:"version"`
+	Version string          `json:"version"`
 	Body    json.RawMessage `json:"body"`
 }
 
@@ -96,15 +97,23 @@ func (ms *Microservice) DeleteClient(wsClient *Client) {
 }
 
 func (ms *Microservice) routeEvent(message Message, client *Client) error {
-	client.AddEvent(
-		Event{
-			Status:       2000,
-			Microservice: message.Microservice,
-			Method:       message.Method,
-			Version:      message.Version,
-			Body:         message.Body,
-		},
-	)
+	if client.userId < 0 && message.Microservice != schema.PathMsAuthenticate {
+		ms.DeleteClient(client)
+		return nil
+	}
+
+	busMsg := schema.Message{
+		FromMicroservice: ms.bus.Name,
+		ToMicroservice:   message.Microservice,
+		Method:           message.Method,
+		Version:          message.Version,
+		Body:             message.Body,
+	}
+
+	err := ms.bus.SendMessageInQueue(message.Microservice, busMsg)
+	if err != nil {
+		return err
+	}
 
 	return nil
 }
