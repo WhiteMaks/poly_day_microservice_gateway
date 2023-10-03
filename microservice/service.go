@@ -2,16 +2,21 @@ package microservice
 
 import (
 	"encoding/json"
+	"github.com/WhiteMaks/poly_day_bus_schema/schema"
 	"github.com/WhiteMaks/poly_day_bus_schema/wbus"
 	"github.com/gorilla/websocket"
 	"log"
 	"net/http"
+	"poly_day_microservice_gateway/utils"
 	"sync"
 )
 
+type Requests map[string]chan schema.Message
+
 type Microservice struct {
-	bus     *wbus.Rabbit
-	clients Clients
+	bus      *wbus.Rabbit
+	requests Requests
+	clients  Clients
 	sync.RWMutex
 }
 
@@ -19,7 +24,7 @@ type Event struct {
 	Microservice string `json:"microservice"` //from microservice
 	//Type         string          `json:"type"`
 	Method  string          `json:"method"`
-	Version float64         `json:"version"`
+	Version string          `json:"version"`
 	Status  int64           `json:"status"`
 	Body    json.RawMessage `json:"body"`
 }
@@ -28,7 +33,7 @@ type Message struct {
 	Microservice string `json:"microservice"` //to microservice
 	//Type         string          `json:"type"`
 	Method  string          `json:"method"`
-	Version float64         `json:"version"`
+	Version string          `json:"version"`
 	Body    json.RawMessage `json:"body"`
 }
 
@@ -37,6 +42,7 @@ func NewMs(bus *wbus.Rabbit) *Microservice {
 
 	ms.bus = bus
 	ms.clients = make(Clients)
+	ms.requests = make(Requests)
 
 	return ms
 }
@@ -46,7 +52,12 @@ func (ms *Microservice) Start(address string, path string) error {
 		ms.upgradeProtocol(writer, request)
 	})
 
-	err := http.ListenAndServe(address, nil)
+	err := ms.bus.SubscribeOnQueue(schema.PathMsGateway, ms.rootMessageHandler)
+	if err != nil {
+		return err
+	}
+
+	err = http.ListenAndServe(address, nil)
 	if err != nil {
 		return err
 	}
@@ -96,17 +107,62 @@ func (ms *Microservice) DeleteClient(wsClient *Client) {
 }
 
 func (ms *Microservice) routeEvent(message Message, client *Client) error {
-	client.AddEvent(
-		Event{
-			Status:       2000,
-			Microservice: message.Microservice,
-			Method:       message.Method,
-			Version:      message.Version,
-			Body:         message.Body,
-		},
-	)
+	if client.userId < 0 && message.Microservice != schema.PathMsAuthenticate {
+		ms.DeleteClient(client)
+		return nil
+	}
+
+	busMeta := schema.Meta{
+		WsId:   client.wsId,
+		UserId: client.userId,
+	}
+
+	requestMsg := schema.Message{
+		FromMicroservice: ms.bus.Name,
+		ToMicroservice:   message.Microservice,
+		Method:           message.Method,
+		Version:          message.Version,
+		Body:             message.Body,
+		Meta:             busMeta,
+		RequestId:        utils.RandomString(15),
+	}
+
+	ms.requests[requestMsg.RequestId] = make(chan schema.Message)
+
+	err := ms.bus.SendMessageInQueue(message.Microservice, requestMsg)
+	if err != nil {
+		return err
+	}
+
+	responseMsg := <-ms.requests[requestMsg.RequestId]
+
+	methodName := schema.GenerateFullMethodNameFromMessage(responseMsg)
+
+	if methodName == schema.CommandIdentifyUser10 && responseMsg.Status == schema.OK {
+		client.userId = responseMsg.Meta.UserId
+	}
+
+	event := Event{
+		Status:       int64(responseMsg.Status),
+		Microservice: responseMsg.FromMicroservice,
+		Method:       responseMsg.Method,
+		Version:      responseMsg.Version,
+		Body:         responseMsg.Body,
+	}
+
+	client.AddEvent(event)
+
+	delete(ms.requests, responseMsg.ResponseId)
 
 	return nil
+}
+
+func (ms *Microservice) rootMessageHandler(message schema.Message) {
+	if message.ResponseId == "" {
+		return
+	}
+
+	ms.requests[message.ResponseId] <- message
 }
 
 func checkOrigin(request *http.Request) bool {
