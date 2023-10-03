@@ -136,14 +136,14 @@ func (ms *Microservice) routeEvent(message Message, client *Client) error {
 
 	responseMsg := <-ms.requests[requestMsg.RequestId]
 
-	methodName := generateFullMethodNameFromMessage(responseMsg)
+	methodName := schema.GenerateFullMethodNameFromMessage(responseMsg)
 
-	if methodName == schema.CommandIdentifyUser10 {
+	if methodName == schema.CommandIdentifyUser10 && responseMsg.Status == schema.OK {
 		client.userId = responseMsg.Meta.UserId
 	}
 
 	event := Event{
-		Status:       2000,
+		Status:       int64(responseMsg.Status),
 		Microservice: responseMsg.FromMicroservice,
 		Method:       responseMsg.Method,
 		Version:      responseMsg.Version,
@@ -163,10 +163,6 @@ func (ms *Microservice) rootMessageHandler(message schema.Message) {
 	}
 
 	ms.requests[message.ResponseId] <- message
-}
-
-func generateFullMethodNameFromMessage(message schema.Message) string { //todo вынести метод в bus schema
-	return message.Method + "-" + message.Version
 }
 
 func checkOrigin(request *http.Request) bool {
