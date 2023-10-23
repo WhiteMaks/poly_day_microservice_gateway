@@ -129,10 +129,7 @@ func (ms *Microservice) routeEvent(message Message, client *Client) error {
 
 	ms.requests[requestMsg.RequestId] = make(chan schema.Message)
 
-	err := ms.bus.SendMessageInQueue(message.Microservice, requestMsg)
-	if err != nil {
-		return err
-	}
+	ms.bus.SendMessage(requestMsg)
 
 	responseMsg := <-ms.requests[requestMsg.RequestId]
 
@@ -158,11 +155,10 @@ func (ms *Microservice) routeEvent(message Message, client *Client) error {
 }
 
 func (ms *Microservice) rootMessageHandler(message schema.Message) {
-	if message.ResponseId == "" {
+	if message.ResponseId != "" {
+		ms.requests[message.ResponseId] <- message
 		return
 	}
-
-	ms.requests[message.ResponseId] <- message
 }
 
 func checkOrigin(request *http.Request) bool {
