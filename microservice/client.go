@@ -5,7 +5,6 @@ import (
 	"github.com/google/uuid"
 	"github.com/gorilla/websocket"
 	"log"
-	"time"
 )
 
 type Clients map[*Client]bool
@@ -17,11 +16,6 @@ type Client struct {
 	ms         *Microservice
 	events     chan Event
 }
-
-var (
-	heartBeatMaxTime  = 10 * time.Second
-	heartBeatInterval = 9 * time.Second
-)
 
 func newClient(connection *websocket.Conn, ms *Microservice) *Client {
 	return &Client{
@@ -37,38 +31,13 @@ func (client *Client) closeConnection() {
 	client.connection.Close()
 }
 
-func (client *Client) updateReadDeadline() error {
-	err := client.connection.SetReadDeadline(time.Now().Add(heartBeatMaxTime))
-	if err != nil {
-		return err
-	}
-
-	return nil
-}
-
-func (client *Client) setupHeartBeat() error {
-	err := client.updateReadDeadline()
-	if err != nil {
-		return err
-	}
-
-	client.connection.SetPongHandler(client.heartBeatHandler)
-
-	return nil
-}
-
 func (client *Client) readMessages() {
 	defer func() {
 		client.ms.DeleteClient(client)
 	}()
 
-	err := client.setupHeartBeat()
-	if err != nil {
-		return
-	}
-
 	for {
-		messageType, payload, err := client.connection.ReadMessage()
+		_, payload, err := client.connection.ReadMessage()
 
 		if err != nil {
 			if websocket.IsUnexpectedCloseError(err, websocket.CloseGoingAway, websocket.CloseAbnormalClosure, websocket.CloseNoStatusReceived) {
@@ -76,8 +45,6 @@ func (client *Client) readMessages() {
 			}
 			break
 		}
-
-		log.Printf("message type: %x, payload: %v from client", messageType, string(payload))
 
 		var message Message
 		err = json.Unmarshal(payload, &message)
@@ -98,8 +65,6 @@ func (client *Client) writeMessages() {
 	defer func() {
 		client.ms.DeleteClient(client)
 	}()
-
-	heartBeating := time.NewTicker(heartBeatInterval)
 
 	for {
 		select {
@@ -123,19 +88,10 @@ func (client *Client) writeMessages() {
 				log.Printf("failed to send message to client: %v", err)
 				return
 			}
-		case <-heartBeating.C:
-			err := client.connection.WriteMessage(websocket.PingMessage, []byte(``))
-			if err != nil {
-				return
-			}
 		}
 	}
 }
 
 func (client *Client) AddEvent(event Event) {
 	client.events <- event
-}
-
-func (client *Client) heartBeatHandler(message string) error {
-	return client.updateReadDeadline()
 }
