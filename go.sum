@@ -8,6 +8,8 @@ github.com/WhiteMaks/poly_day_bus_schema v0.1.9 h1:jrUHbTGyyY77X/MWc0r22Du2D6szA
 github.com/WhiteMaks/poly_day_bus_schema v0.1.9/go.mod h1:zTKcsOMRt5Gd78NZXPn12JM2aTP0/w2KDzOghdhOUag=
 github.com/WhiteMaks/poly_day_bus_schema v0.2.1 h1:Le6eXOwPEUYNJldPxgD7b4nMc/zFWETM/y2VKh0CAhA=
 github.com/WhiteMaks/poly_day_bus_schema v0.2.1/go.mod h1:zTKcsOMRt5Gd78NZXPn12JM2aTP0/w2KDzOghdhOUag=
+github.com/WhiteMaks/poly_day_bus_schema v0.2.2 h1:h7qM4hP3Yj5DmTPtcynUr+TpnArA+nik9Ly3aLJVBx0=
+github.com/WhiteMaks/poly_day_bus_schema v0.2.2/go.mod h1:zTKcsOMRt5Gd78NZXPn12JM2aTP0/w2KDzOghdhOUag=
 github.com/davecgh/go-spew v1.1.0/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSsI+c5H38=
 github.com/davecgh/go-spew v1.1.1 h1:vj9j/u1bqnvCEfJOwUhtlOARqs3+rkHYY13jYWTU97c=
 github.com/davecgh/go-spew v1.1.1/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSsI+c5H38=
